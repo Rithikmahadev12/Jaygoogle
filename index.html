@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SearchX</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="home-page">
+
+  <header class="home-header">
+    <nav class="top-nav">
+      <a href="#">About</a>
+      <a href="#">Store</a>
+      <a href="results.html">Search</a>
+      <a href="#" class="btn-signin">Sign in</a>
+    </nav>
+  </header>
+
+  <main class="home-main">
+    <div class="logo">
+      <span class="logo-s">S</span><span class="logo-e">e</span><span class="logo-a">a</span><span class="logo-r">r</span><span class="logo-c">c</span><span class="logo-h">h</span><span class="logo-x">X</span>
+    </div>
+
+    <form class="search-form" action="results.html" method="get">
+      <div class="search-box home-search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="text"
+          name="q"
+          id="home-input"
+          class="search-input"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder=""
+        />
+        <div class="mic-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
+        <div id="home-suggestions" class="suggestions-dropdown"></div>
+      </div>
+      <div class="home-buttons">
+        <button type="submit" class="btn-search">SearchX Search</button>
+        <button type="button" class="btn-lucky" onclick="feelingLucky()">I'm Feeling Lucky</button>
+      </div>
+    </form>
+
+    <div class="home-language">
+      SearchX offered in: <a href="#">Español</a> <a href="#">Français</a> <a href="#">Deutsch</a>
+    </div>
+  </main>
+
+  <footer class="home-footer">
+    <div class="footer-country">United States</div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <a href="#">Advertising</a>
+        <a href="#">Business</a>
+        <a href="#">How Search works</a>
+      </div>
+      <div class="footer-col">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Settings</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    initHomeSuggestions('home-input', 'home-suggestions');
+  </script>
+</body>
+</html>
