@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SearchX</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="results-page">
+
+  <header class="results-header">
+    <a href="index.html" class="results-logo">
+      <span class="logo-s">S</span><span class="logo-e">e</span><span class="logo-a">a</span><span class="logo-r">r</span><span class="logo-c">c</span><span class="logo-h">h</span><span class="logo-x">X</span>
+    </a>
+
+    <form class="search-form results-search-form" action="results.html" method="get">
+      <div class="search-box results-search-box">
+        <input
+          type="text"
+          name="q"
+          id="results-input"
+          class="search-input"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="search-box-actions">
+          <button type="button" class="icon-btn clear-btn" id="clear-btn" style="display:none" aria-label="Clear">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          <div class="divider-v"></div>
+          <button type="submit" class="icon-btn" aria-label="Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
+        </div>
+        <div id="results-suggestions" class="suggestions-dropdown"></div>
+      </div>
+    </form>
+
+    <div class="results-header-actions">
+      <button class="icon-btn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+      <button class="btn-signin">Sign in</button>
+    </div>
+  </header>
+
+  <nav class="results-tabs">
+    <a href="#" class="tab active" data-cat="general">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      All
+    </a>
+    <a href="#" class="tab" data-cat="images">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Images
+    </a>
+    <a href="#" class="tab" data-cat="news">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 0-1-1.73V6"/><path d="M8 2v4"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/><line x1="8" y1="9" x2="16" y2="9"/></svg>
+      News
+    </a>
+    <a href="#" class="tab" data-cat="videos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      Videos
+    </a>
+    <a href="#" class="tab" data-cat="science">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+      Shopping
+    </a>
+    <a href="#" class="tab" data-cat="map">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      Maps
+    </a>
+    <a href="#" class="tab tab-more">
+      More
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </a>
+
+    <div class="tab-tools">
+      <button class="tab-tool-btn" id="time-filter-btn">
+        Tools
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="time-filter-menu" id="time-filter-menu" style="display:none">
+        <button onclick="setTimeFilter('any')">Any time</button>
+        <button onclick="setTimeFilter('day')">Past 24 hours</button>
+        <button onclick="setTimeFilter('week')">Past week</button>
+        <button onclick="setTimeFilter('month')">Past month</button>
+        <button onclick="setTimeFilter('year')">Past year</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="results-body">
+    <div class="results-main">
+      <div id="results-meta" class="results-meta"></div>
+      <div id="answer-box" class="answer-box" style="display:none"></div>
+      <div id="infobox" class="infobox" style="display:none"></div>
+      <div id="suggestions-row" class="suggestions-row" style="display:none"></div>
+      <div id="results-list"></div>
+      <div id="images-grid" class="images-grid" style="display:none"></div>
+      <div id="pagination" class="pagination"></div>
+    </div>
+    <div class="results-sidebar" id="sidebar"></div>
+  </div>
+
+  <footer class="results-footer">
+    <div class="footer-country">United States</div>
+    <div class="footer-links">
+      <a href="#">Help</a>
+      <a href="#">Send feedback</a>
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    initResultsPage();
+  </script>
+</body>
+</html>
