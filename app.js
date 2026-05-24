@@ -1,16 +1,20 @@
 /* ── SearchX app.js ──────────────────────────────────────────────────────── */
 
 const SEARX_INSTANCES = [
+  'https://searx.tiekoetter.com',
+  'https://search.bus-hit.me',
   'https://searx.be',
-  'https://search.mdosch.de',
-  'https://searxng.site',
-  'https://search.sapti.me',
   'https://paulgo.io',
+  'https://search.sapti.me',
+  'https://searx.lunar.icu',
+  'https://search.mdosch.de',
 ];
 
 const CORS_PROXIES = [
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/get?url=',
+  { prefix: 'https://corsproxy.io/?url=',           type: 'raw'        },
+  { prefix: 'https://api.allorigins.win/raw?url=',  type: 'raw'        },
+  { prefix: 'https://api.allorigins.win/get?url=',  type: 'allorigins' },
+  { prefix: 'https://thingproxy.freeboard.io/fetch/', type: 'raw'      },
 ];
 
 let currentQuery = '';
@@ -74,39 +78,51 @@ async function fetchResults(query, category, page, timeRange) {
   });
   if (timeRange && timeRange !== 'any') params.set('time_range', timeRange);
 
+  const errors = [];
+
   for (let p = 0; p < CORS_PROXIES.length; p++) {
+    const proxy = CORS_PROXIES[(currentProxyIdx + p) % CORS_PROXIES.length];
+
     for (let i = 0; i < SEARX_INSTANCES.length; i++) {
       const idx = (currentInstanceIdx + i) % SEARX_INSTANCES.length;
-      const proxy = CORS_PROXIES[(currentProxyIdx + p) % CORS_PROXIES.length];
       const apiUrl = `${SEARX_INSTANCES[idx]}/search?${params}`;
+      const fetchUrl = proxy.prefix + encodeURIComponent(apiUrl);
 
       try {
-        const isAllOrigins = proxy.includes('allorigins');
-        const fetchUrl = isAllOrigins
-          ? `${proxy}${encodeURIComponent(apiUrl)}`
-          : `${proxy}${encodeURIComponent(apiUrl)}`;
+        const res = await fetch(fetchUrl, {
+          signal: AbortSignal.timeout(9000),
+          headers: { 'Accept': 'application/json' },
+        });
 
-        const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) continue;
-
-        let data;
-        if (isAllOrigins) {
-          const wrapper = await res.json();
-          data = JSON.parse(wrapper.contents);
-        } else {
-          data = await res.json();
+        if (!res.ok) {
+          errors.push(`${proxy.prefix} → ${SEARX_INSTANCES[idx]}: HTTP ${res.status}`);
+          continue;
         }
 
-        if (data && (data.results !== undefined)) {
+        let data;
+        if (proxy.type === 'allorigins') {
+          const wrapper = await res.json();
+          if (!wrapper.contents) continue;
+          data = JSON.parse(wrapper.contents);
+        } else {
+          const text = await res.text();
+          data = JSON.parse(text);
+        }
+
+        if (data && data.results !== undefined) {
           currentInstanceIdx = idx;
+          currentProxyIdx = (currentProxyIdx + p) % CORS_PROXIES.length;
           return data;
         }
       } catch (e) {
+        errors.push(`${SEARX_INSTANCES[idx]}: ${e.message}`);
         continue;
       }
     }
   }
-  throw new Error('All search instances failed. Please try again.');
+
+  console.error('All attempts failed:\n' + errors.join('\n'));
+  throw new Error('All search instances failed. Please try again in a moment.');
 }
 
 /* ── Suggestions (DuckDuckGo autocomplete) ───────────────────────────────── */
@@ -116,9 +132,9 @@ let suggestTimer = null;
 async function fetchSuggestions(q) {
   if (!q || q.length < 2) return [];
   try {
-    const proxy = 'https://corsproxy.io/?';
     const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(q)}&type=list`;
-    const res = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(3000) });
+    const fetchUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
+    const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(3000) });
     const data = await res.json();
     return Array.isArray(data[1]) ? data[1].slice(0, 8) : [];
   } catch {
