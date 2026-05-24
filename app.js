@@ -1,28 +1,11 @@
 /* ── SearchX app.js ──────────────────────────────────────────────────────── */
+// All search requests go to /search on your own Render server.
+// No CORS proxies. No third-party dependency.
 
-const SEARX_INSTANCES = [
-  'https://searx.tiekoetter.com',
-  'https://search.bus-hit.me',
-  'https://searx.be',
-  'https://paulgo.io',
-  'https://search.sapti.me',
-  'https://searx.lunar.icu',
-  'https://search.mdosch.de',
-];
-
-const CORS_PROXIES = [
-  { prefix: 'https://corsproxy.io/?url=',           type: 'raw'        },
-  { prefix: 'https://api.allorigins.win/raw?url=',  type: 'raw'        },
-  { prefix: 'https://api.allorigins.win/get?url=',  type: 'allorigins' },
-  { prefix: 'https://thingproxy.freeboard.io/fetch/', type: 'raw'      },
-];
-
-let currentQuery = '';
-let currentCategory = 'general';
-let currentPage = 1;
+let currentQuery      = '';
+let currentCategory   = 'general';
+let currentPage       = 1;
 let currentTimeFilter = 'any';
-let currentInstanceIdx = 0;
-let currentProxyIdx = 0;
 
 /* ── Utility ─────────────────────────────────────────────────────────────── */
 
@@ -32,7 +15,9 @@ function getParam(name) {
 
 function setParam(params) {
   const url = new URL(window.location.href);
-  Object.entries(params).forEach(([k, v]) => v ? url.searchParams.set(k, v) : url.searchParams.delete(k));
+  Object.entries(params).forEach(([k, v]) =>
+    v ? url.searchParams.set(k, v) : url.searchParams.delete(k)
+  );
   window.history.pushState({}, '', url);
 }
 
@@ -41,7 +26,9 @@ function getDomain(url) {
 }
 
 function getFavicon(url) {
-  try { return `https://www.google.com/s2/favicons?sz=32&domain=${new URL(url).hostname}`; } catch { return ''; }
+  try {
+    return `https://www.google.com/s2/favicons?sz=32&domain=${new URL(url).hostname}`;
+  } catch { return ''; }
 }
 
 function formatDate(d) {
@@ -51,12 +38,12 @@ function formatDate(d) {
     if (isNaN(date)) return '';
     const diff = Date.now() - date;
     const days = Math.floor(diff / 86400000);
-    if (days < 1) return 'Today';
+    if (days < 1)   return 'Today';
     if (days === 1) return '1 day ago';
-    if (days < 7) return `${days} days ago`;
-    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    if (days < 7)   return `${days} days ago`;
+    if (days < 30)  return `${Math.floor(days / 7)} weeks ago`;
     if (days < 365) return `${Math.floor(days / 30)} months ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
   } catch { return ''; }
 }
 
@@ -66,75 +53,42 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
-/* ── API Fetch ───────────────────────────────────────────────────────────── */
+/* ── API Fetch — hits your own /search endpoint ──────────────────────────── */
 
 async function fetchResults(query, category, page, timeRange) {
-  const pagenum = page || 1;
   const params = new URLSearchParams({
-    q: query,
+    q:          query,
     categories: category || 'general',
-    format: 'json',
-    pageno: pagenum,
+    pageno:     page || 1,
   });
   if (timeRange && timeRange !== 'any') params.set('time_range', timeRange);
 
-  const errors = [];
+  const res = await fetch(`/search?${params}`, {
+    signal: AbortSignal.timeout(12000),
+  });
 
-  for (let p = 0; p < CORS_PROXIES.length; p++) {
-    const proxy = CORS_PROXIES[(currentProxyIdx + p) % CORS_PROXIES.length];
-
-    for (let i = 0; i < SEARX_INSTANCES.length; i++) {
-      const idx = (currentInstanceIdx + i) % SEARX_INSTANCES.length;
-      const apiUrl = `${SEARX_INSTANCES[idx]}/search?${params}`;
-      const fetchUrl = proxy.prefix + encodeURIComponent(apiUrl);
-
-      try {
-        const res = await fetch(fetchUrl, {
-          signal: AbortSignal.timeout(9000),
-          headers: { 'Accept': 'application/json' },
-        });
-
-        if (!res.ok) {
-          errors.push(`${proxy.prefix} → ${SEARX_INSTANCES[idx]}: HTTP ${res.status}`);
-          continue;
-        }
-
-        let data;
-        if (proxy.type === 'allorigins') {
-          const wrapper = await res.json();
-          if (!wrapper.contents) continue;
-          data = JSON.parse(wrapper.contents);
-        } else {
-          const text = await res.text();
-          data = JSON.parse(text);
-        }
-
-        if (data && data.results !== undefined) {
-          currentInstanceIdx = idx;
-          currentProxyIdx = (currentProxyIdx + p) % CORS_PROXIES.length;
-          return data;
-        }
-      } catch (e) {
-        errors.push(`${SEARX_INSTANCES[idx]}: ${e.message}`);
-        continue;
-      }
-    }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Server error ${res.status}`);
   }
 
-  console.error('All attempts failed:\n' + errors.join('\n'));
-  throw new Error('All search instances failed. Please try again in a moment.');
+  return res.json();
 }
 
-/* ── Suggestions (DuckDuckGo autocomplete) ───────────────────────────────── */
+/* ── Suggestions (DuckDuckGo autocomplete via your proxy) ────────────────── */
 
 let suggestTimer = null;
 
 async function fetchSuggestions(q) {
   if (!q || q.length < 2) return [];
   try {
-    const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(q)}&type=list`;
-    const fetchUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
-    const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(3000) });
+    // Route through your server so there's no CORS issue
+    const url = `/search?q=${encodeURIComponent(q)}&categories=general&pageno=1`;
+    // Use DuckDuckGo's AC endpoint — it does have CORS headers so can be called directly
+    const res = await fetch(
+      `https://duckduckgo.com/ac/?q=${encodeURIComponent(q)}&type=list`,
+      { signal: AbortSignal.timeout(3000) }
+    );
     const data = await res.json();
     return Array.isArray(data[1]) ? data[1].slice(0, 8) : [];
   } catch {
@@ -143,7 +97,7 @@ async function fetchSuggestions(q) {
 }
 
 function initSuggestionsUI(inputId, dropdownId) {
-  const input = document.getElementById(inputId);
+  const input    = document.getElementById(inputId);
   const dropdown = document.getElementById(dropdownId);
   if (!input || !dropdown) return;
 
@@ -158,7 +112,7 @@ function initSuggestionsUI(inputId, dropdownId) {
   });
 
   input.addEventListener('keydown', (e) => {
-    const items = dropdown.querySelectorAll('.suggestion-item');
+    const items  = dropdown.querySelectorAll('.suggestion-item');
     const active = dropdown.querySelector('.suggestion-item.highlighted');
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -184,17 +138,16 @@ function initSuggestionsUI(inputId, dropdownId) {
   });
 
   document.addEventListener('click', (e) => {
-    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+    if (!input.contains(e.target) && !dropdown.contains(e.target))
       dropdown.classList.remove('open');
-    }
   });
 }
 
 function renderSuggestions(suggestions, input, dropdown) {
   if (!suggestions.length) { dropdown.classList.remove('open'); return; }
-  const searchIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
+  const icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
   dropdown.innerHTML = suggestions.map(s =>
-    `<div class="suggestion-item" data-value="${escapeHtml(s)}">${searchIcon}<span>${escapeHtml(s)}</span></div>`
+    `<div class="suggestion-item" data-value="${escapeHtml(s)}">${icon}<span>${escapeHtml(s)}</span></div>`
   ).join('');
   dropdown.classList.add('open');
   dropdown.querySelectorAll('.suggestion-item').forEach(item => {
@@ -222,9 +175,9 @@ function feelingLucky() {
 /* ── Results Page ────────────────────────────────────────────────────────── */
 
 function initResultsPage() {
-  currentQuery = getParam('q');
-  currentCategory = getParam('cat') || 'general';
-  currentPage = parseInt(getParam('page')) || 1;
+  currentQuery      = getParam('q');
+  currentCategory   = getParam('cat') || 'general';
+  currentPage       = parseInt(getParam('page')) || 1;
   currentTimeFilter = getParam('time') || 'any';
 
   const input = document.getElementById('results-input');
@@ -237,20 +190,14 @@ function initResultsPage() {
   setupTabs();
   setupTimeFilter();
 
-  if (currentQuery) {
-    runSearch();
-  }
+  if (currentQuery) runSearch();
 }
 
 function setupClearButton() {
-  const input = document.getElementById('results-input');
+  const input    = document.getElementById('results-input');
   const clearBtn = document.getElementById('clear-btn');
   if (!input || !clearBtn) return;
-
-  const update = () => {
-    clearBtn.style.display = input.value ? 'flex' : 'none';
-  };
-
+  const update = () => { clearBtn.style.display = input.value ? 'flex' : 'none'; };
   update();
   input.addEventListener('input', update);
   clearBtn.addEventListener('click', () => { input.value = ''; input.focus(); update(); });
@@ -262,7 +209,7 @@ function setupTabs() {
     tab.addEventListener('click', (e) => {
       e.preventDefault();
       currentCategory = tab.dataset.cat;
-      currentPage = 1;
+      currentPage     = 1;
       setParam({ cat: currentCategory === 'general' ? '' : currentCategory, page: '' });
       document.querySelectorAll('.tab[data-cat]').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
@@ -272,7 +219,7 @@ function setupTabs() {
 }
 
 function setupTimeFilter() {
-  const btn = document.getElementById('time-filter-btn');
+  const btn  = document.getElementById('time-filter-btn');
   const menu = document.getElementById('time-filter-menu');
   if (!btn || !menu) return;
   btn.addEventListener('click', () => {
@@ -285,24 +232,22 @@ function setupTimeFilter() {
 
 function setTimeFilter(range) {
   currentTimeFilter = range;
-  currentPage = 1;
+  currentPage       = 1;
   setParam({ time: range === 'any' ? '' : range, page: '' });
   document.getElementById('time-filter-menu').style.display = 'none';
-  document.getElementById('time-filter-btn').firstChild.textContent = range === 'any' ? 'Tools' : range.charAt(0).toUpperCase() + range.slice(1);
+  document.getElementById('time-filter-btn').firstChild.textContent =
+    range === 'any' ? 'Tools' : range.charAt(0).toUpperCase() + range.slice(1);
   runSearch();
 }
 
 /* ── Search execution ────────────────────────────────────────────────────── */
 
 async function runSearch() {
-  const q = currentQuery;
-  if (!q) return;
-
+  if (!currentQuery) return;
   showLoader();
-
   try {
-    const data = await fetchResults(q, currentCategory, currentPage, currentTimeFilter);
-    renderAll(data, q);
+    const data = await fetchResults(currentQuery, currentCategory, currentPage, currentTimeFilter);
+    renderAll(data, currentQuery);
   } catch (err) {
     showError(err.message);
   }
@@ -334,9 +279,9 @@ function showLoader() {
 function showError(msg) {
   const list = document.getElementById('results-list');
   if (list) {
-    list.innerHTML = `<div style="padding: 24px 0; color: #d93025; font-size: 15px;">
+    list.innerHTML = `<div style="padding:24px 0;color:#d93025;font-size:15px">
       <strong>Search error:</strong> ${escapeHtml(msg)}
-      <p style="color: #70757a; margin-top: 8px; font-size: 13px;">Try again in a moment or check your connection.</p>
+      <p style="color:#70757a;margin-top:8px;font-size:13px">Try again in a moment.</p>
     </div>`;
   }
 }
@@ -348,13 +293,11 @@ function renderAll(data, q) {
   renderAnswerBox(data);
   renderInfobox(data);
   renderSuggestionsRow(data);
-
   if (currentCategory === 'images') {
     renderImages(data.results || []);
   } else {
     renderResults(data.results || []);
   }
-
   renderSidebar(data);
   renderPagination(data, q);
 }
@@ -362,12 +305,9 @@ function renderAll(data, q) {
 function renderMeta(data) {
   const el = document.getElementById('results-meta');
   if (!el) return;
-  const total = data.number_of_results;
-  if (total) {
-    el.textContent = `About ${total.toLocaleString()} results`;
-  } else {
-    el.textContent = '';
-  }
+  el.textContent = data.number_of_results
+    ? `About ${data.number_of_results.toLocaleString()} results`
+    : '';
 }
 
 function renderAnswerBox(data) {
@@ -385,7 +325,9 @@ function renderInfobox(data) {
   const boxes = data.infoboxes || [];
   if (!boxes.length) { el.style.display = 'none'; return; }
   const box = boxes[0];
-  const imgHtml = box.img_src ? `<img src="${escapeHtml(box.img_src)}" class="infobox-img" alt="" onerror="this.style.display='none'" />` : '';
+  const imgHtml = box.img_src
+    ? `<img src="${escapeHtml(box.img_src)}" class="infobox-img" alt="" onerror="this.style.display='none'" />`
+    : '';
   const links = (box.urls || []).map(u =>
     `<a href="${escapeHtml(u.url)}" target="_blank" rel="noopener">${escapeHtml(u.title)}</a>`
   ).join('');
@@ -394,11 +336,10 @@ function renderInfobox(data) {
     <div class="infobox-title">${escapeHtml(box.infobox)}</div>
     <div class="infobox-type">${escapeHtml(box.entity || '')}</div>
     <div class="infobox-body">
-      <div class="infobox-text">${escapeHtml(box.content || '').substring(0, 400)}${(box.content || '').length > 400 ? '...' : ''}</div>
+      <div class="infobox-text">${escapeHtml((box.content || '').substring(0, 400))}${(box.content||'').length > 400 ? '...' : ''}</div>
       ${imgHtml}
     </div>
-    ${links ? `<div class="infobox-links">${links}</div>` : ''}
-  `;
+    ${links ? `<div class="infobox-links">${links}</div>` : ''}`;
 }
 
 function renderSuggestionsRow(data) {
@@ -408,7 +349,7 @@ function renderSuggestionsRow(data) {
   if (!suggestions.length) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
   el.innerHTML = suggestions.slice(0, 8).map(s =>
-    `<button class="suggestion-pill" onclick="searchFor('${escapeHtml(s.replace(/'/g, "\\'"))}')">${escapeHtml(s)}</button>`
+    `<button class="suggestion-pill" onclick="searchFor('${escapeHtml(s.replace(/'/g,"\\'"))}')">${escapeHtml(s)}</button>`
   ).join('');
 }
 
@@ -422,15 +363,15 @@ function renderResults(results) {
   if (!results.length) {
     list.innerHTML = `<div style="padding:20px 0;font-size:15px;color:#202124">
       No results found for <strong>${escapeHtml(currentQuery)}</strong>.<br>
-      <span style="color:#70757a;font-size:13px">Try different keywords or check your spelling.</span>
+      <span style="color:#70757a;font-size:13px">Try different keywords.</span>
     </div>`;
     return;
   }
 
   list.innerHTML = results.map(r => {
     const favicon = getFavicon(r.url);
-    const domain = getDomain(r.url);
-    const date = formatDate(r.publishedDate);
+    const domain  = getDomain(r.url);
+    const date    = formatDate(r.publishedDate);
     return `
       <div class="result-item">
         <div class="result-source">
@@ -462,7 +403,7 @@ function renderImages(results) {
     grid.style.display = 'none';
     if (list) {
       list.style.display = 'block';
-      list.innerHTML = `<div style="padding:20px 0;font-size:15px;color:#202124">No images found. Try a different search.</div>`;
+      list.innerHTML = `<div style="padding:20px 0;font-size:15px;color:#202124">No images found.</div>`;
     }
     return;
   }
@@ -472,7 +413,7 @@ function renderImages(results) {
     const src = r.img_src || r.thumbnail_src;
     return `
       <div class="image-item" onclick="window.open('${escapeHtml(r.url)}','_blank')">
-        <img src="${escapeHtml(src)}" alt="${escapeHtml(r.title || '')}" loading="lazy" onerror="this.parentElement.style.display='none'" />
+        <img src="${escapeHtml(src)}" alt="${escapeHtml(r.title||'')}" loading="lazy" onerror="this.parentElement.style.display='none'" />
         <div class="image-caption">${escapeHtml(r.title || getDomain(r.url))}</div>
       </div>`;
   }).join('');
@@ -482,7 +423,6 @@ function renderSidebar(data) {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
   sidebar.innerHTML = '';
-
   const boxes = data.infoboxes || [];
   if (!boxes.length) return;
   const box = boxes[0];
@@ -490,11 +430,9 @@ function renderSidebar(data) {
   const imgHtml = box.img_src
     ? `<img src="${escapeHtml(box.img_src)}" class="sidebar-card-img" alt="" onerror="this.style.display='none'" />`
     : '';
-
   const factsHtml = (box.attributes || []).slice(0, 6).map(attr =>
     `<div class="fact-row"><span class="fact-label">${escapeHtml(attr.label)}</span><span class="fact-value">${escapeHtml(attr.value)}</span></div>`
   ).join('');
-
   const linksHtml = (box.urls || []).map(u =>
     `<a href="${escapeHtml(u.url)}" target="_blank" rel="noopener">${escapeHtml(u.title)}</a>`
   ).join('');
@@ -515,30 +453,19 @@ function renderSidebar(data) {
 function renderPagination(data, q) {
   const el = document.getElementById('pagination');
   if (!el) return;
-
-  const total = data.number_of_results || 0;
-  const perPage = 10;
-  const totalPages = Math.min(Math.ceil(total / perPage), 10);
-
+  const total      = data.number_of_results || 0;
+  const totalPages = Math.min(Math.ceil(total / 10), 10);
   if (totalPages <= 1) { el.innerHTML = ''; return; }
 
-  const logoHtml = `<span class="page-logo">
-    <span class="logo-s">S</span><span class="logo-e">e</span><span class="logo-a">a</span><span class="logo-r">r</span>
-  </span>`;
-
+  const logoHtml = `<span class="page-logo"><span class="logo-s">S</span><span class="logo-e">e</span><span class="logo-a">a</span><span class="logo-r">r</span></span>`;
   let pages = '';
   for (let p = 1; p <= totalPages; p++) {
-    const cls = p === currentPage ? 'page-btn active' : 'page-btn';
-    pages += `<button class="${cls}" onclick="goToPage(${p})">${p}</button>`;
+    pages += `<button class="page-btn${p === currentPage ? ' active' : ''}" onclick="goToPage(${p})">${p}</button>`;
   }
-
   const prevBtn = currentPage > 1
-    ? `<button class="page-nav" onclick="goToPage(${currentPage - 1})">← Previous</button>`
-    : '';
-
+    ? `<button class="page-nav" onclick="goToPage(${currentPage - 1})">← Previous</button>` : '';
   const nextBtn = currentPage < totalPages
-    ? `<button class="page-nav" onclick="goToPage(${currentPage + 1})">Next →</button>`
-    : '';
+    ? `<button class="page-nav" onclick="goToPage(${currentPage + 1})">Next →</button>` : '';
 
   el.innerHTML = `${prevBtn}${logoHtml}${pages}${nextBtn}`;
 }
@@ -554,8 +481,8 @@ function goToPage(page) {
 
 function searchFor(query) {
   currentQuery = query;
-  currentPage = 1;
-  const input = document.getElementById('results-input');
+  currentPage  = 1;
+  const input  = document.getElementById('results-input');
   if (input) input.value = query;
   document.title = `${query} - SearchX`;
   setParam({ q: query, page: '' });
