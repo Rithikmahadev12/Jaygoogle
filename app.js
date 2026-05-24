@@ -329,7 +329,7 @@ function renderInfobox(data) {
     ? `<img src="${escapeHtml(box.img_src)}" class="infobox-img" alt="" onerror="this.style.display='none'" />`
     : '';
   const links = (box.urls || []).map(u =>
-    `<a href="${escapeHtml(u.url)}" target="_blank" rel="noopener">${escapeHtml(u.title)}</a>`
+    `<a href="${escapeHtml(u.url)}" ${escapeHtml(u.title)}</a>`
   ).join('');
   el.style.display = 'block';
   el.innerHTML = `
@@ -381,7 +381,7 @@ function renderResults(results) {
             <div class="result-source-domain">${escapeHtml(r.url.length > 70 ? r.url.substring(0, 70) + '...' : r.url)}</div>
           </div>
         </div>
-        <a class="result-title" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">
+        <a class="result-title" href="${escapeHtml(r.url)}" 
           ${r.title || 'Untitled'}
         </a>
         <div class="result-snippet">
@@ -412,7 +412,7 @@ function renderImages(results) {
   grid.innerHTML = imgResults.map(r => {
     const src = r.img_src || r.thumbnail_src;
     return `
-      <div class="image-item" onclick="window.open('${escapeHtml(r.url)}','_blank')">
+      <div class="image-item" onclick="window.location.href='${escapeHtml(r.url)}'">
         <img src="${escapeHtml(src)}" alt="${escapeHtml(r.title||'')}" loading="lazy" onerror="this.parentElement.style.display='none'" />
         <div class="image-caption">${escapeHtml(r.title || getDomain(r.url))}</div>
       </div>`;
@@ -434,7 +434,7 @@ function renderSidebar(data) {
     `<div class="fact-row"><span class="fact-label">${escapeHtml(attr.label)}</span><span class="fact-value">${escapeHtml(attr.value)}</span></div>`
   ).join('');
   const linksHtml = (box.urls || []).map(u =>
-    `<a href="${escapeHtml(u.url)}" target="_blank" rel="noopener">${escapeHtml(u.title)}</a>`
+    `<a href="${escapeHtml(u.url)}" ${escapeHtml(u.title)}</a>`
   ).join('');
 
   sidebar.innerHTML = `
